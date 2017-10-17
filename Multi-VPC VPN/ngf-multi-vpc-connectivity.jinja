@@ -1,0 +1,25 @@
+imports:
+  - path: vpc.jinja
+    name: vpc.jinja
+  - path: ngf.jinja
+    name: ngf.jinja
+
+
+resources:
+  - name: hubVpc
+    type: vpc.jinja
+    properties:
+      vpcName: {{ properties[ 'vpcName' ]}}
+      ipRange: {{ properties[ 'vpcIpRange' ]}}
+      region: {{ properties[ 'region' ]}}
+      ipAliasRange: {{ properties[ 'ngfVPNRange' ]}}
+      peerings: {{ properties[ 'vpcPeeringsList' ]}}
+  - name: ngf
+    type: ngf.jinja
+    properties:
+      instanceName: {{ properties[ 'instanceName' ]}}
+      instanceSize: {{ properties[ 'instanceSize']}}
+      zone: {{ properties[ 'zone' ]}}
+      vpc: $(ref.hubVpc.vpcLink)
+      subnet: $(ref.hubVpc.subnetLink)
+      s2sRange: {{ properties[ 'ngfVPNRange' ]}}

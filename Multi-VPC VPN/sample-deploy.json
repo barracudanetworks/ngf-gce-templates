@@ -1,0 +1,19 @@
+imports:
+ - path: https://raw.githubusercontent.com/barracudanetworks/ngf-gce-templates/multi-vpc-vpn/Multi-VPC%20VPN/ngf-multi-vpc-connectivity.jinja
+   name: ngf-multi-vpc-connectivity.jinja
+
+resources:
+ - name: ngf-multi-vpc-connectivity-deployment
+   type: ngf-multi-vpc-connectivity.jinja
+   properties:
+      vpcName: bam-vpc-vpn-hub
+      vpcIpRange: 10.1.0.0/25
+      ngfVPNRange: 10.0.0.0/16
+      ngfRemoteAccessRange: 10.1.0.128/25
+      instanceName: bam-ngf-in-hub
+      instanceType: n1-standard-1
+      region: europe-west1
+      zone: europe-west1-b
+      vpcPeeringsList:
+       - name: peer1
+         network: bam-test2

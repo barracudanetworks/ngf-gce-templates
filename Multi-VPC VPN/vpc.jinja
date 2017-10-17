@@ -1,0 +1,35 @@
+resources:
+ - name: {{ properties[ 'vpcName' ]}}
+   type: compute.v1.network
+   properties:
+    autoCreateSubnetworks: No
+    peerings: {{ properties[ 'peerings' ]}}
+ - name: {{ properties[ 'vpcName' ]}}subnet
+   type: compute.v1.subnetwork
+   properties:
+    ipCidrRange: {{ properties[ 'ipRange' ]}}
+    secondaryIpRanges:
+    - rangeName: ngf-vpn-route
+      ipCidrRange: {{ properties[ 'ipAliasRange' ]}}
+    region: {{ properties[ 'region' ]}}
+    privateIpGoogleAccess: Yes
+    network: $(ref.{{ properties[ 'vpcName' ]}}.selfLink)
+ - name: {{ properties[ 'vpcName' ]}}-ngfwingress
+   type: compute.v1.firewall
+   properties:
+    network: $(ref.{{ properties[ 'vpcName' ]}}.selfLink)
+    sourceRanges:
+     - 0.0.0.0/0
+    targetTags:
+     - ngfw
+    direction: INGRESS
+    priority: 1000
+    allowed:
+     - IPProtocol: tcp
+     - IPProtocol: udp
+     - IPProtocol: icmp
+outputs:
+  - name: vpcLink
+    value: $(ref.{{ properties[ 'vpcName' ]}}.selfLink)
+  - name: subnetLink
+    value: $(ref.{{ properties[ 'vpcName' ]}}subnet.selfLink)
