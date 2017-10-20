@@ -2,7 +2,7 @@
 
 This solution deploys a new VPC (Hub VPC) and an NGF instance forming an access hub between peered VPCs and external resources.
 
-![Network diagram](GCP - multi-vpc cloud connectivity.png)
+![Network diagram](ngf-multi-vpc-connectivity.png)
 
 More information on the architecture can be foundin [Barracuda Campus]().
 ## Before You Begin
