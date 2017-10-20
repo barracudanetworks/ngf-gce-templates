@@ -9,7 +9,6 @@ resources:
       vpcName: bam-vpc-vpn-hub
       vpcIpRange: 10.1.0.0/25
       ngfVPNRange: 10.0.0.0/16
-      ngfRemoteAccessRange: 10.1.0.128/25
       instanceName: bam-ngf-in-hub
       instanceType: n1-standard-1
       region: europe-west1
