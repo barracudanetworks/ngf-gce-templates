@@ -1,0 +1,74 @@
+imports:
+  - path: vpc.jinja
+    name: vpc.jinja
+  - path: ngf-2nics.jinja
+    name: ngf-2nics.jinja
+
+
+resources:
+  - name: vpcOne
+    type: vpc.jinja
+    properties:
+      vpcName: {{ properties[ 'vpcOneName' ]}}
+      ipRange: {{ properties[ 'vpcOneIpRange' ]}}
+      region: {{ properties[ 'region' ]}}
+  - name: vpcTwo
+    type: vpc.jinja
+    properties:
+      vpcName: {{ properties[ 'vpcTwoName' ]}}
+      ipRange: {{ properties[ 'vpcTwoIpRange' ]}}
+      region: {{ properties[ 'region' ]}}
+  - name: ngfPrimary
+    type: ngf-2nics.jinja
+    properties:
+      instanceName: {{ properties[ 'instanceName' ]}}
+      instanceSize: {{ properties[ 'instanceSize']}}
+      zone: {{ properties[ 'zoneOne' ]}}
+      vpcOne: $(ref.vpcOne.vpcLink)
+      subnetOne: $(ref.vpcOne.subnetLink)
+      vpcTwo: $(ref.vpcTwo.vpcLink)
+      subnetTwo: $(ref.vpcTwo.subnetLink)
+      serviceAccount: {{ properties[ 'serviceAccount' ]}}
+  - name: ngfSecondary
+    type: ngf-2nics.jinja
+    properties:
+      instanceName: {{ properties[ 'instanceName' ]}}-ha
+      instanceSize: {{ properties[ 'instanceSize']}}
+      zone: {{ properties[ 'zoneTwo' ]}}
+      vpcOne: $(ref.vpcOne.vpcLink)
+      subnetOne: $(ref.vpcOne.subnetLink)
+      vpcTwo: $(ref.vpcTwo.vpcLink)
+      subnetTwo: $(ref.vpcTwo.subnetLink)
+      serviceAccount: {{ properties[ 'serviceAccount' ]}}
+  - name: {{ env[ 'deployment' ]}}-route1-ngfw-out
+    type: compute.v1.route
+    properties:
+      destRange: 0.0.0.0/0
+      network: $(ref.vpcOne.vpcLink)
+      priority: 10
+      nextHopGateway: projects/{{ env[ 'project' ]}}/global/gateways/default-internet-gateway
+      tags:
+        - ngfw
+  - name: {{ env[ 'deployment' ]}}-route1-via-ngfw
+    type: compute.v1.route
+    properties:
+      destRange: 0.0.0.0/0
+      network: $(ref.vpcOne.vpcLink)
+      priority: 100
+      nextHopInstance: $(ref.ngfPrimary.boxLink)
+  - name: {{ env[ 'deployment' ]}}-route2-ngfw-out
+    type: compute.v1.route
+    properties:
+      destRange: 0.0.0.0/0
+      network: $(ref.vpcTwo.vpcLink)
+      priority: 10
+      nextHopGateway: projects/{{ env[ 'project' ]}}/global/gateways/default-internet-gateway
+      tags:
+        - ngfw
+  - name: {{ env[ 'deployment' ]}}-route2-via-ngfw
+    type: compute.v1.route
+    properties:
+      destRange: 0.0.0.0/0
+      network: $(ref.vpcTwo.vpcLink)
+      priority: 100
+      nextHopInstance: $(ref.ngfPrimary.boxLink)

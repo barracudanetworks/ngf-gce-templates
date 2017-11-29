@@ -1,0 +1,18 @@
+imports:
+ - path: NGF_HA_cluster.jinja
+   name: NGF_HA_cluster.jinja
+
+resources:
+ - name: ngf-ha-deployment
+   type: NGF_HA_cluster.jinja
+   properties:
+      vpcOneName: bam-vpc1
+      vpcOneIpRange: 10.1.0.0/24
+      vpcTwoName: bam-vpc2
+      vpcTwoIpRange: 10.2.0.0/24
+      instanceName: bam-ngf1
+      instanceType: n1-standard-1
+      region: europe-west1
+      zoneOne: europe-west1-b
+      zoneTwo: europe-west1-c
+      serviceAccount: ngfha-serviceaccount@ng-team.iam.gserviceaccount.com

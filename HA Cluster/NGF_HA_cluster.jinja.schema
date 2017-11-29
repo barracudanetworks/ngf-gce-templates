@@ -1,0 +1,41 @@
+info:
+  title: Barracuda NextGen Firewall - HA cluster
+  description: Creates 2 VPCs and 2 NGFs with two NICs each for th HA setup
+  author: bmoczulski@barracuda.compute
+
+imports:
+- path: NGF_HA_cluster.jinja
+- path: vpc.jinja
+- path: ngf-2nics.jinja
+
+
+properties:
+  vpcOneName:
+    type: string
+    description: Name of hub VPC
+    default: vpn1
+  vpcOneIpRange:
+    type: string
+    description: IP range (CIDR) for Hub VPC. Keep it small, you will not have a lot of resources here
+  vpcTwoName:
+    type: string
+    description: Name of hub VPC
+    default: vpn2
+  vpcTwoIpRange:
+    type: string
+    description: IP range (CIDR) for Hub VPC. Keep it small, you will not have a lot of resources here
+  instanceName:
+    type: string
+    description: Name of the firewall instance
+    pattern: ^(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?)$
+  instanceSize:
+    type: string
+    description: Instance type to use for firewall
+    default: n1-standard-1
+  region:
+    type: string
+    description: Compute region to deploy to
+  zone:
+    type: string
+    description: Availability zone to deploy to
+    metadata: gce-zone

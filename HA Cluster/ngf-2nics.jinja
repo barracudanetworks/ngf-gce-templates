@@ -1,0 +1,34 @@
+resources:
+ - name: {{ properties[ 'instanceName' ]}}
+   type: compute.v1.instance
+   properties:
+    zone: {{ properties[ 'zone' ]}}
+    machineType: zones/{{ properties[ 'zone' ]}}/machineTypes/{{ properties[ 'instanceSize' ]}}
+    canIpForward: Yes
+    disks:
+     - deviceName: boot
+       type: PERSISTENT
+       boot: true
+       autoDelete: true
+       initializeParams:
+         sourceImage: projects/barracuda-release/global/images/cudangfbyol-v711-056-hf843-hf844-20170926
+    networkInterfaces:
+     - network: {{ properties[ 'vpcOne' ]}}
+       subnetwork: {{ properties[ 'subnetOne' ]}}
+       accessConfigs:
+        - name: Mgmt Access
+          type: ONE_TO_ONE_NAT
+     - network: {{ properties[ 'vpcTwo' ]}}
+       subnetwork: {{ properties[ 'subnetTwo' ]}}
+
+    serviceAccounts:
+      - email: {{ properties[ 'serviceAccount' ]}}
+        scopes:
+          - https://www.googleapis.com/auth/cloud-platform
+
+    tags:
+      items:
+        - ngfw
+outputs:
+  - name: boxLink
+    value: $(ref.{{ properties[ 'instanceName' ]}}.selfLink)
