@@ -16,7 +16,7 @@ function update_route {
 	local -r this_zone=$7
 
 	created_route_desc_string="route $name: $dest_range via ${this_name} (${this_zone}) in network $network with priority $priority"
-	route_list=$(gcloud compute routes list --filter="name:${name} AND destRange:${dest_range} AND nextHopInstance:${this_zone}/instances/${this_name} AND network:${network} AND priority:${priority}" 2>/dev/null)
+	route_list=$(gcloud compute routes list --filter="name=${name} AND destRange=${dest_range} AND nextHopInstance=${this_zone}/instances/${this_name} AND network=${network} AND priority=${priority}" 2>/dev/null)
 	if [[ "_${route_list}" != "_" ]];
 	then
 		ilog "$created_route_desc_string is set"
