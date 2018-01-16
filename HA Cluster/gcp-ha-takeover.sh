@@ -15,34 +15,28 @@ function update_route {
 	local -r this_name=$6
 	local -r this_zone=$7
 
-	created_route_desc_string="route $name: $dest_range via ${this_name} (${this_zone}) in network $network with priority $priority"
-	route_list=$(gcloud compute routes list --filter="name=${name} AND destRange=${dest_range} AND nextHopInstance=${this_zone}/instances/${this_name} AND network=${network} AND priority=${priority}" 2>/dev/null)
-	if [[ "_${route_list}" != "_" ]];
-	then
-		ilog "$created_route_desc_string is set"
-		return 0
-	fi
-
-	gcloud compute routes describe $name &>/dev/null
-	[[ $? == 0 ]] && {
+	retries=0
+	while [ $retries -lt $ROUTE_UPDATE_RETRIES ]
+	do
+		retries=$((retries + 1))
+		created_route_desc_string="route $name: $dest_range via ${this_name} (${this_zone}) in network $network with priority $priority"
 		deleted_route_desc_string="route $name: $dest_range via ${other_name} in network $network with priority $priority"
+
 		gcloud -q compute routes delete $name &>/dev/null
 		[[ $? != 0 ]] && {
 			elog "error deleting $deleted_route_desc_string"
-			return 1
+			continue
 		}
 		ilog "deleted route $deleted_route_desc_string"
-	}
 
-	gcloud compute routes describe $name &>/dev/null
-	[[ $? != 0 ]] && {
 		gcloud compute routes create $name --destination-range=$dest_range --next-hop-instance=${this_name} --next-hop-instance-zone=${this_zone} --network=$network --priority=$priority &>/dev/null
 		[[ $? != 0 ]] && {
 			elog "error creating $created_route_desc_string"
-			return 1
+			continue
 		}
 		ilog "created $created_route_desc_string"
-	}
+		break
+	done
 	return 0
 }
 
@@ -58,6 +52,13 @@ function update_route {
 
 [[ ! -f "/opt/phion/config/active/boxnetha.conf" && ! -f "/opt/phion/config/active/boxnet.conf" ]] && {
 	elog "could not find the  network configuration"
+	exit 1
+}
+
+project_id=$(curl -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/project/project-id 2>/dev/null)
+
+[[ "_$project_id" == "_" ]] && {
+	elog "could not find the gcp project name"
 	exit 1
 }
 
@@ -78,32 +79,39 @@ done
 }
 vpc_name=$(basename $vpc_name)
 
-
 other_instance_mgmt_ip=$(boxinfo config /opt/phion/config/active/boxnetha.conf boxnet ip 2>/dev/null)
 [[ "_${other_instance_mgmt_ip}" == "_" ]] && {
 	elog "could not find HA partner management IP"
 	exit 1
 }
 
-other_instance_name=$(gcloud compute instances list --filter="networkInterfaces.networkIP:${other_instance_mgmt_ip} AND networkInterfaces.network:${vpc_name}" --format="value(name)" 2>/dev/null)
+other_instance_name_and_zone=( $(gcloud compute instances list --filter="networkInterfaces.networkIP=${other_instance_mgmt_ip} AND networkInterfaces.network=${vpc_name}" --format="value(name,zone)" 2>/dev/null) )
+other_instance_name=${other_instance_name_and_zone[0]}
+other_instance_zone=${other_instance_name_and_zone[1]}
 
-gcloud compute routes list --filter="nextHopInstance:${other_instance_name}" --format="value(name,destRange,network,priority)" 2>/dev/null | while read -r name dest_range network priority; do
-	echo "route $name: $dest_range via ${other_name} in network $network with priority $priority"
-	tried_update=0
-	route_updated=0
-	while [ $tried_update -lt $ROUTE_UPDATE_RETRIES ]
-	do
-		if update_route $name $dest_range $network $priority $other_instance_name $this_instance_name $this_instance_zone;
-		then
-			tried_update+=1
-			sleep 1
-			continue
-		fi
-		route_updated=1
-	done
-	[[ ! $route_updated ]] && {
-		elog "error updating route $name: $dest_range via ${other_name} in network $network with priority $priority"
-	}
+routes_to_update=$(gcloud compute routes list --filter="nextHopInstance=https://www.googleapis.com/compute/v1/projects/${project_id}/zones/${other_instance_zone}/instances/${other_instance_name}" --format="value(name,destRange,network,priority)" 2>/dev/null)
+if [ -z "$routes_to_update" ]
+then
+        ilog "no routes to update found"
+        exit 0
+fi
+
+echo "${routes_to_update}" | while read -r name dest_range network priority; do
+	update_route $name $dest_range $network $priority $other_instance_name $this_instance_name $this_instance_zone &
+done
+
+sleep 30
+
+routes_to_update_array=( $( echo "${routes_to_update}" | awk '{printf "%s\n", $1}') )
+number_of_routes_to_update=${#routes_to_update_array[@]}
+number_of_routes_updated=0
+retries=0
+while [ $number_of_routes_to_update -gt $number_of_routes_updated -a $retries -lt $ROUTE_UPDATE_RETRIES ]
+do
+	routes_updated=( $(gcloud compute routes list --filter="nextHopInstance=https://www.googleapis.com/compute/v1/projects/${project_id}/zones/${other_instance_zone}/instances/${this_instance_name}" --format="value(name)" 2>/dev/null) )
+	number_of_routes_updated=${#routes_updated[@]}
+	retries=$(( retries + 1 ))
+	sleep 20
 done
 
 exit 0
