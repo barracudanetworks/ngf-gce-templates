@@ -29,6 +29,8 @@ resources:
       vpcTwo: $(ref.vpcTwo.vpcLink)
       subnetTwo: $(ref.vpcTwo.subnetLink)
       serviceAccount: {{ properties[ 'serviceAccount' ]}}
+      imageName: {{ properties[ 'imageName' ]}}
+      password: {{ properties[ 'password' ]}}
   - name: ngfSecondary
     type: ngf-2nics.jinja
     properties:
@@ -40,6 +42,8 @@ resources:
       vpcTwo: $(ref.vpcTwo.vpcLink)
       subnetTwo: $(ref.vpcTwo.subnetLink)
       serviceAccount: {{ properties[ 'serviceAccount' ]}}
+      imageName: {{ properties[ 'imageName' ]}}
+      password: {{ properties[ 'password' ] }}
   - name: {{ env[ 'deployment' ]}}-route1-ngfw-out
     type: compute.v1.route
     properties:
@@ -72,3 +76,49 @@ resources:
       network: $(ref.vpcTwo.vpcLink)
       priority: 100
       nextHopInstance: $(ref.ngfPrimary.boxLink)
+  - name: {{ env[ 'deployment' ]}}-healthprobe
+    type: compute.v1.httpHealthCheck
+    properties:
+      checkIntervalSec: 5
+      healthyThreschold: 1
+      unhealthyThreshold: 2
+      port: 447
+      requestPath: /
+  - name: {{env[ 'deployment' ]}}-ngf-pool
+    type: compute.v1.targetPool
+    properties:
+      sessionAffinity: CLIENT_IP
+      region: {{ properties[ "region" ]}}
+      healthChecks:
+       - $(ref.{{ env[ 'deployment' ]}}-healthprobe.selfLink)
+      instances:
+       - $(ref.ngfPrimary.boxLink)
+       - $(ref.ngfSecondary.boxLink)
+  - name: {{env[ 'deployment' ]}}-public-ip
+    type: compute.v1.address
+    properties:
+      addressType: EXTERNAL
+      region: {{ properties[ "region" ]}}
+  - name: {{env[ 'deployment' ]}}-frontgate-tcp
+    type: compute.v1.forwardingRule
+    properties:
+      region: {{ properties[ "region" ]}}
+      IPAddress: $(ref.{{env[ 'deployment' ]}}-public-ip.selfLink)
+      IPProtocol: TCP
+      loadBalancingScheme: EXTERNAL
+      target: $(ref.{{env[ 'deployment' ]}}-ngf-pool.selfLink)
+  - name: {{env[ 'deployment' ]}}-frontgate-udp
+    type: compute.v1.forwardingRule
+    properties:
+      region: {{ properties[ "region" ]}}
+      IPAddress: $(ref.{{env[ 'deployment' ]}}-public-ip.selfLink)
+      IPProtocol: UDP
+      loadBalancingScheme: EXTERNAL
+      target: $(ref.{{env[ 'deployment' ]}}-ngf-pool.selfLink)
+outputs:
+  - name: serviceIp
+    value: $(ref.{{env[ 'deployment' ]}}-public-ip.address)
+  - name: ngfPrimaryIp
+    value: $(ref.ngfPrimary.mgmtIp)
+  - name: ngfSecondaryIp
+    value: $(ref.ngfSecondary.mgmtIp)

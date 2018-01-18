@@ -5,13 +5,24 @@ resources:
     zone: {{ properties[ 'zone' ]}}
     machineType: zones/{{ properties[ 'zone' ]}}/machineTypes/{{ properties[ 'instanceSize' ]}}
     canIpForward: Yes
+    metadata:
+      items:
+        - key: barracuda-initial_user_password
+          value: {{ properties[ 'password' ]}}
+        - key: startup-script
+          value: |
+            #!/bin/bash
+            wget -O /opt/phion/hooks/ha/gcp-ha-takeover.sh https://raw.githubusercontent.com/barracudanetworks/ngf-gce-templates/HA/HA%20Cluster/gcp-ha-takeover.sh
+            chmod +x /opt/phion/hooks/ha/gcp-ha-takeover.sh
+            editconf --file /opt/phion/config/configroot/boxnet.conf -s cards_10dynmod -p NUM -v 2
+
     disks:
      - deviceName: boot
        type: PERSISTENT
        boot: true
        autoDelete: true
        initializeParams:
-         sourceImage: projects/barracuda-release/global/images/cudangfbyol-v711-056-hf843-hf844-20170926
+         sourceImage: projects/barracuda-release/global/images/{{ properties[ 'imageName' ]}}
     networkInterfaces:
      - network: {{ properties[ 'vpcOne' ]}}
        subnetwork: {{ properties[ 'subnetOne' ]}}
@@ -20,7 +31,6 @@ resources:
           type: ONE_TO_ONE_NAT
      - network: {{ properties[ 'vpcTwo' ]}}
        subnetwork: {{ properties[ 'subnetTwo' ]}}
-
     serviceAccounts:
       - email: {{ properties[ 'serviceAccount' ]}}
         scopes:
@@ -32,3 +42,5 @@ resources:
 outputs:
   - name: boxLink
     value: $(ref.{{ properties[ 'instanceName' ]}}.selfLink)
+  - name: mgmtIp
+    value: $(ref.{{ properties[ 'instanceName' ]}}.networkInterfaces[0].accessConfigs[0].natIP)
