@@ -56,7 +56,7 @@ function update_route {
 }
 
 
-[[ ! -f "/opt/phion/config/active/boxnetha.conf" && ! -f "/opt/phion/config/active/boxnet.conf" ]] && {
+[[ ! -f "/opt/phion/config/active/boxnetha.conf" && ! -f "/opt/phion/config/active/boxnet.conf" && ! -f "/opt/phion/config/active/data/box.dbconf" ]] && {
 	elog "could not find the  network configuration"
 	exit 1
 }
@@ -69,12 +69,12 @@ project_id=$(curl -H "Metadata-Flavor: Google" http://metadata.google.internal/c
 }
 
 this_instance_name=$(curl -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/name 2>/dev/null)
-this_instance_mgmt_ip=$(boxinfo config /opt/phion/config/active/boxnet.conf boxnet ip 2>/dev/null)
+mip=$(boxinfo config /opt/phion/config/active/boxnet.conf boxnet ip 2>/dev/null)
 this_instance_zone=$(basename $(curl -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/zone 2>/dev/null))
 for itfIdx in $(curl -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/ 2>/dev/null)
 do
 	itfIp=$(curl -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/$itfIdx/ip 2>/dev/null)
-	[[ "_$itfIp" == "_$this_instance_mgmt_ip" ]] && {
+	[[ "_$itfIp" == "_$mip" ]] && {
 		vpc_name=$(curl -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/$itfIdx/network 2>/dev/null)
 	}
 done
@@ -85,13 +85,42 @@ done
 }
 vpc_name=$(basename $vpc_name)
 
-other_instance_mgmt_ip=$(boxinfo config /opt/phion/config/active/boxnetha.conf boxnet ip 2>/dev/null)
-[[ "_${other_instance_mgmt_ip}" == "_" ]] && {
-	elog "could not find HA partner management IP"
-	exit 1
-}
+declare -a this_instance_mgmt_ip
+declare -a other_instance_mgmt_ip
 
-other_instance_name_and_zone=( $(gcloud -q compute instances list --filter="networkInterfaces.networkIP=${other_instance_mgmt_ip} AND networkInterfaces.network=${vpc_name}" --format="value(name,zone)" 2>/dev/null) )
+if [ -f /opt/phion/config/active/boxnetha.conf ]; then
+        # assume DHA
+        this_instance_mgmt_ip=($(boxinfo config /opt/phion/config/active/boxnet.conf boxnet ip 2>/dev/null))
+        other_instance_mgmt_ip=($(boxinfo config /opt/phion/config/active/boxnetha.conf boxnet ip 2>/dev/null))
+else
+        # CC-managed HA
+        boxid=$(boxinfo config /opt/phion/config/active/box.conf / name)
+        while read -r line; do
+                box=$(echo $line|awk -F "|" '{ print $1; }')
+                iplist=$(echo $line| awk '{ $1=""; gsub(/^ /, "", $0); print; }')
+                if [[ $box == $boxid ]]; then
+                        this_instance_mgmt_ip=($iplist)
+                else
+                        other_instance_mgmt_ip=($iplist)
+                fi
+        done <<< "$(showdb /opt/phion/config/active/data/box.dbconf|grep allboxips)"
+fi
+
+if [[ ${#other_instance_mgmt_ip[@]} -eq 0 ]]; then
+        elog "could not find HA partner IP addresses"
+        exit 1
+fi
+
+filter="networkInterfaces.network:${vpc_name} AND ("
+for idx in "${!other_instance_mgmt_ip[@]}"; do
+        if [ $idx -gt 0 ]; then
+                filter+=" OR "
+        fi
+        filter+="networkInterfaces.networkIP:${other_instance_mgmt_ip[$idx]}"
+done
+filter+=")"
+
+other_instance_name_and_zone=( $(gcloud -q compute instances list --filter="$filter" --format="value(name,zone)" 2>/dev/null) )
 other_instance_name=${other_instance_name_and_zone[0]}
 other_instance_zone=${other_instance_name_and_zone[1]}
 
