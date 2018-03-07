@@ -15,13 +15,14 @@ function update_route {
 	local -r other_name=$5
 	local -r this_name=$6
 	local -r this_zone=$7
+	local -r tags="${8//;/,}"
 
 	retries=0
 	while [ $retries -lt $ROUTE_UPDATE_RETRIES ]
 	do
 		retries=$((retries + 1))
-		created_route_desc_string="route $name: $dest_range via ${this_name} (${this_zone}) in network $network with priority $priority"
-		deleted_route_desc_string="route $name: $dest_range via ${other_name} in network $network with priority $priority"
+		created_route_desc_string="route $name: $dest_range via ${this_name} (${this_zone}) in network $network with priority $priority and tags $tags"
+		deleted_route_desc_string="route $name: $dest_range via ${other_name} in network $network with priority $priority and tags $tags"
 
 		gcloud -q compute routes delete $name &>/dev/null
 		[[ $? != 0 ]] && {
@@ -30,7 +31,11 @@ function update_route {
 		}
 		ilog "deleted route $deleted_route_desc_string"
 
-		gcloud -q compute routes create $name --destination-range=$dest_range --next-hop-instance=${this_name} --next-hop-instance-zone=${this_zone} --network=$network --priority=$priority &>/dev/null
+		if [ $tags ]; then
+			gcloud -q compute routes create $name --destination-range=$dest_range --next-hop-instance=${this_name} --next-hop-instance-zone=${this_zone} --network=$network --priority=$priority --tags="$tags" &>/dev/null
+		else
+			gcloud -q compute routes create $name --destination-range=$dest_range --next-hop-instance=${this_name} --next-hop-instance-zone=${this_zone} --network=$network --priority=$priority &>/dev/null
+		fi
 		[[ $? != 0 ]] && {
 			elog "error creating $created_route_desc_string"
 			continue
@@ -90,15 +95,15 @@ other_instance_name_and_zone=( $(gcloud -q compute instances list --filter="netw
 other_instance_name=${other_instance_name_and_zone[0]}
 other_instance_zone=${other_instance_name_and_zone[1]}
 
-routes_to_update=$(gcloud -q compute routes list --filter="nextHopInstance=https://www.googleapis.com/compute/v1/projects/${project_id}/zones/${other_instance_zone}/instances/${other_instance_name}" --format="value(name,destRange,network,priority)" 2>/dev/null)
+routes_to_update=$(gcloud -q compute routes list --filter="nextHopInstance=https://www.googleapis.com/compute/v1/projects/${project_id}/zones/${other_instance_zone}/instances/${other_instance_name}" --format="value(name,destRange,network,priority,tags)" 2>/dev/null)
 if [ -z "$routes_to_update" ]
 then
 	ilog "no routes to update found"
 	exit 0
 fi
 
-echo "${routes_to_update}" | while read -r name dest_range network priority; do
-	update_route $name $dest_range $network $priority $other_instance_name $this_instance_name $this_instance_zone &
+echo "${routes_to_update}" | while read -r name dest_range network priority tags; do
+	update_route $name $dest_range $network $priority $other_instance_name $this_instance_name $this_instance_zone $tags &
 done
 
 sleep 30
