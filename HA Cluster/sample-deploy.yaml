@@ -16,7 +16,7 @@ resources:
       zoneOne: europe-west1-b
       zoneTwo: europe-west1-c
       serviceAccount: ngfha-serviceaccount@ng-team.iam.gserviceaccount.com
-      imageName: cudangfbyol-v720-158-20171213
+      imageName: projects/barracuda-release/global/images/cudangfbyol-v720-158-20171213
       password: ngf1r3wall
 outputs:
   - name: Service IP Address
