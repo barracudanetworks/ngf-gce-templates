@@ -22,7 +22,7 @@ resources:
        boot: true
        autoDelete: true
        initializeParams:
-         sourceImage: projects/barracuda-release/global/images/{{ properties[ 'imageName' ]}}
+         sourceImage: {{ properties[ 'imageName' ]}}
     networkInterfaces:
      - network: {{ properties[ 'vpcOne' ]}}
        subnetwork: {{ properties[ 'subnetOne' ]}}
